@@ -177,26 +177,39 @@
   </div>
 <script>
 (function(){
+// One call to the hub script returns the open/closed state of all four forms.
+var HUB_API='https://script.google.com/a/~/macros/s/AKfycbwAXBRYwzVaT_UX4ZYkGY6J5OuQWeR3COi-zpHL0JY4QMxluqYWGZliCO73m2Qd0blJ/exec';
 var FORMS=[
- {region:'FL',label:'Florida',api:'https://script.google.com/a/~/macros/s/AKfycbwuxlMKC2wurtYpnHAXf8C0zBDI4sQot41Za7-09Bt83qNsoh9GTnmkjjEJXLMYXMPm/exec',page:'https://cascadetropicals.github.io/ct-oba-fl/'},
- {region:'CTG',label:'Locally Grown',api:'https://script.google.com/a/~/macros/s/AKfycbx7a3FlqBHYMnltJpWnig6SjuX-Z0Amn9bAuvlHqLyNl2NrlpqE-YAL0fl4NJPSDUjMJQ/exec',page:'https://cascadetropicals.github.io/ct-oba-ctg/'},
- {region:'CA',label:'California',api:'https://script.google.com/a/~/macros/s/AKfycbwBP9pwOXmdV3U-0F5obW0Eb3AQjHr2aTmzN5s7TZeZdnA9_Q5cb2GbMmDzfwmb9OFtZQ/exec',page:'https://cascadetropicals.github.io/ct-oba-ca/'},
- {region:'HI',label:'Hawaii',api:'https://script.google.com/a/~/macros/s/AKfycbxKH_54k1piftjBA-ci-rjFeNMUk2OF84b3-IVllpc2ZyLXz8JGbG_3r3y0JfSUWa-R/exec',page:'https://cascadetropicals.github.io/ct-oba-hi/'}
+ {region:'FL',label:'Florida',page:'https://cascadetropicals.github.io/ct-oba-fl/'},
+ {region:'CTG',label:'Locally Grown',page:'https://cascadetropicals.github.io/ct-oba-ctg/'},
+ {region:'CA',label:'California',page:'https://cascadetropicals.github.io/ct-oba-ca/'},
+ {region:'HI',label:'Hawaii',page:'https://cascadetropicals.github.io/ct-oba-hi/'}
 ];
 var grid=document.querySelector('.grid');
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function openCard(f){return '<a class="card card-open" href="'+esc(f.page)+'" target="_blank" rel="noopener"><span class="card-region">'+esc(f.region)+'</span><span class="card-label">'+esc(f.label)+'</span><span class="card-status card-status-open">Open \u2014 tap to order</span></a>';}
-function closedCard(f){return '<div class="card card-closed" aria-disabled="true"><span class="card-region">'+esc(f.region)+'</span><span class="card-label">'+esc(f.label)+'</span><span class="card-status card-status-closed">Currently closed</span></div>';}
-function render(i,html){var el=document.getElementById('card-'+i);if(el)el.outerHTML='<span id="card-'+i+'" style="display:contents">'+html+'</span>';}
-FORMS.forEach(function(f,i){
-  grid.insertAdjacentHTML('beforeend','<span id="card-'+i+'" style="display:contents">'+closedCard(f).replace('Currently closed','Checking\u2026')+'</span>');
-});
-FORMS.forEach(function(f,i){
-  fetch(f.api+'?action=status&_='+Date.now(),{redirect:'follow'})
-    .then(function(r){if(!r.ok)throw new Error('x');return r.json();})
-    .then(function(j){if(!j||!j.ok)throw new Error('x');render(i,(j.status&&j.status.closed)?closedCard(f):openCard(f));})
-    .catch(function(){render(i,openCard(f));});
-});
+function closedCard(f,text){return '<div class="card card-closed" aria-disabled="true"><span class="card-region">'+esc(f.region)+'</span><span class="card-label">'+esc(f.label)+'</span><span class="card-status card-status-closed">'+text+'</span></div>';}
+function render(){
+  var html='';
+  FORMS.forEach(function(f){ html+=f.state==='open'?openCard(f):(f.state==='closed'?closedCard(f,'Currently closed'):closedCard(f,'Checking\u2026')); });
+  grid.innerHTML=html;
+}
+render();
+fetch(HUB_API+'?action=status&_='+Date.now(),{redirect:'follow'})
+  .then(function(r){if(!r.ok)throw new Error('x');return r.json();})
+  .then(function(j){
+    if(!j||!j.ok||!j.statuses)throw new Error('x');
+    FORMS.forEach(function(f){
+      var s=j.statuses.filter(function(x){return x.region===f.region;})[0];
+      f.state=(s&&!s.open)?'closed':'open';
+    });
+    render();
+  })
+  .catch(function(){
+    // Status unavailable: show every form as a link; each form page shows its own closed message.
+    FORMS.forEach(function(f){f.state='open';});
+    render();
+  });
 })();
 </script>
 </body>
